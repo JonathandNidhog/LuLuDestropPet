@@ -14,6 +14,15 @@ BASE_COLS = 4
 BASE_ROWS = 2
 BASELINE_Y = 116
 TARGET_SUBJECT_MAX = 104
+STATE_TARGETS = {
+    "idle": {"width": 104, "height": 82, "baseline": 116},
+    "curious": {"width": 104, "height": 74, "baseline": 116},
+    "walk": {"width": 104, "height": 86, "baseline": 116},
+    "play": {"width": 106, "height": 88, "baseline": 116},
+    "grabbed": {"width": 72, "height": 110, "baseline": 121},
+    "dropped": {"width": 108, "height": 70, "baseline": 118},
+    "recover": {"width": 102, "height": 84, "baseline": 116},
+}
 
 
 def remove_green_key(image: Image.Image) -> Image.Image:
@@ -80,24 +89,30 @@ def fit_frame(image: Image.Image, scale: float, x_bias: int = 0, y_bias: int = 0
     return place_subject(subject, x_bias, y_bias)
 
 
-def place_subject(subject: Image.Image, x_bias: int = 0, y_bias: int = 0) -> Image.Image:
+def place_subject(subject: Image.Image, x_bias: int = 0, y_bias: int = 0, baseline: int = BASELINE_Y) -> Image.Image:
     if subject.width > FRAME_SIZE - 10 or subject.height > FRAME_SIZE - 10:
         subject.thumbnail((FRAME_SIZE - 10, FRAME_SIZE - 10), Image.Resampling.NEAREST)
 
     frame = Image.new("RGBA", (FRAME_SIZE, FRAME_SIZE), (0, 0, 0, 0))
     x = clamp((FRAME_SIZE - subject.width) // 2 + x_bias, 4, FRAME_SIZE - subject.width - 4)
-    y = clamp(BASELINE_Y - subject.height + y_bias, 4, FRAME_SIZE - subject.height - 4)
+    y = clamp(baseline - subject.height + y_bias, 4, FRAME_SIZE - subject.height - 4)
     frame.alpha_composite(subject, (x, y))
     return frame
 
 
-def transform_frame(frame: Image.Image, dx: int = 0, dy: int = 0) -> Image.Image:
+def normalize_for_state(frame: Image.Image, state_name: str, dx: int = 0, dy: int = 0) -> Image.Image:
     bbox = subject_bbox(frame)
     if not bbox:
         return frame.copy()
 
     subject = frame.crop(bbox)
-    return place_subject(subject, dx, dy)
+    target = STATE_TARGETS[state_name]
+    scale = min(target["width"] / subject.width, target["height"] / subject.height)
+    subject = subject.resize(
+        (max(1, round(subject.width * scale)), max(1, round(subject.height * scale))),
+        Image.Resampling.NEAREST,
+    )
+    return place_subject(subject, dx, dy, target["baseline"])
 
 
 def pingpong(values):
@@ -105,45 +120,43 @@ def pingpong(values):
 
 
 def make_frames(base):
-    idle_open, idle_blink, crouch, stretch, reach, grabbed, flat, loaf = base
+    idle_open, _idle_blink, crouch, stretch, reach, grabbed, flat, loaf = base
     frames = []
 
-    # 0-31 idle: no turning, only breathing, blink, tiny tail/body settle.
+    # 0-31 idle: use the same source pose every frame to prevent visual scale flicker.
     for i in range(32):
-        pose = idle_blink if i in (14, 15) else idle_open
-        breath = round(math.sin(i / 32 * math.tau) * 1)
-        frames.append(transform_frame(pose, dy=breath))
+        frames.append(normalize_for_state(idle_open, "idle"))
 
     # 32-47 curious: crouch/look-near, gentle forward interest.
     for i in range(16):
         dx = round(math.sin(i / 16 * math.tau) * 1)
         dy = -1 if 4 <= i <= 10 else 0
-        frames.append(transform_frame(crouch, dx=dx, dy=dy))
+        frames.append(normalize_for_state(crouch, "curious", dx=dx, dy=dy))
 
     # 48-67 approach: actual walking/creeping pose sequence, not idle.
     walk_steps = pingpong([-5, -3, 0, 3, 5])
     for i in range(20):
         pose = stretch if i % 2 else reach
-        frames.append(transform_frame(pose, dx=walk_steps[i % len(walk_steps)], dy=0 if i % 2 else 1))
+        frames.append(normalize_for_state(pose, "walk", dx=walk_steps[i % len(walk_steps)], dy=0 if i % 2 else 1))
 
     # 68-91 play: reach and paw tap loop.
     for i in range(24):
         pose = reach if i % 6 < 3 else stretch
         tap = -3 if i % 6 in (1, 2) else 0
-        frames.append(transform_frame(pose, dx=round(math.sin(i / 24 * math.tau) * 2), dy=tap))
+        frames.append(normalize_for_state(pose, "play", dx=round(math.sin(i / 24 * math.tau) * 2), dy=tap))
 
     # 92-107 grabbed: held by back of neck, subtle body sway only.
     for i in range(16):
-        frames.append(transform_frame(grabbed, dx=round(math.sin(i / 16 * math.tau) * 2), dy=round(math.cos(i / 16 * math.tau) * 1)))
+        frames.append(normalize_for_state(grabbed, "grabbed", dx=round(math.sin(i / 16 * math.tau) * 2), dy=round(math.cos(i / 16 * math.tau) * 1)))
 
     # 108-119 dropped: soft landing using flat/squash.
     for i in range(12):
-        frames.append(transform_frame(flat, dy=3 - min(i, 5)))
+        frames.append(normalize_for_state(flat, "dropped", dy=3 - min(i, 5)))
 
     # 120-127 recover: loaf settles back into idle.
     for i in range(8):
         pose = loaf if i < 5 else idle_open
-        frames.append(transform_frame(pose, dy=round(math.sin(i / 8 * math.tau) * 1)))
+        frames.append(normalize_for_state(pose, "recover", dy=round(math.sin(i / 8 * math.tau) * 1)))
 
     assert len(frames) == 128
     return frames

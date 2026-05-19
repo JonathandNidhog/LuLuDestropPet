@@ -49,7 +49,7 @@ git push
 
 The current version uses a 128-frame sprite sheet generated from the approved 8-pose Lulu pixel-art concept. Idle is intentionally restricted to the lying/blinking pose so Lulu does not spin in place.
 
-- `idle`: 32 frames
+- `idle`: 32 frames, fixed from one source pose to avoid size flicker
 - `curious`: 16 frames
 - `walk`: 20 frames
 - `play`: 24 frames
@@ -63,6 +63,7 @@ Renderer behavior:
 - State changes crossfade briefly to reduce hard cuts.
 - States have minimum dwell times so idle, walk, and play do not flicker rapidly.
 - Generated frames keep a fixed scale; dropped frames no longer squash-scale the cat.
+- Idle frames are bbox-audited to keep identical visible width, height, and baseline.
 
 Regenerate the sprite assets with:
 
