@@ -9,7 +9,7 @@ Cream cameo Maine Coon boy Lulu as a desktop pet. This version uses a generated 
 - Drop: Lulu lands with a soft squash animation.
 - No text bubbles by default.
 - Tray size menu: Small / Medium / Large.
-- 128 sprite frames are loaded from `src/assets/lulu-sprite-128.png`.
+- Runtime sprites are split by action under `src/assets/actions/`.
 
 ## Run
 
@@ -59,11 +59,21 @@ The current version uses a 128-frame sprite sheet generated from the approved 8-
 
 Renderer behavior:
 
-- Lulu flips horizontally based on the mouse direction.
+- Mouse interaction actions are split into eight directional sprite files.
 - State changes crossfade briefly to reduce hard cuts.
 - States have minimum dwell times so idle, walk, and play do not flicker rapidly.
 - Generated frames keep a fixed scale; dropped frames no longer squash-scale the cat.
 - Idle frames are bbox-audited to keep identical visible width, height, and baseline.
+
+Action sprite layout:
+
+- `idle.png`
+- `grabbed-neck.png`
+- `dropped.png`
+- `recover.png`
+- `curious-{e,ne,n,nw,w,sw,s,se}.png`
+- `walk-{e,ne,n,nw,w,sw,s,se}.png`
+- `play-{e,ne,n,nw,w,sw,s,se}.png`
 
 Regenerate the sprite assets with:
 

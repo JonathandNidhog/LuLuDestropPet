@@ -1,5 +1,6 @@
 from pathlib import Path
 import math
+import json
 
 from PIL import Image
 
@@ -9,6 +10,7 @@ SOURCE = Path(
     r"C:\Users\daiyuwei\.codex\generated_images\019e3ffc-3d3d-7c43-8844-dc2490b48576\ig_054528519faf27c3016a0c515935888199a021e3a4589d1ed3.png"
 )
 ASSET_DIR = ROOT / "src" / "assets"
+ACTION_DIR = ASSET_DIR / "actions"
 FRAME_SIZE = 128
 BASE_COLS = 4
 BASE_ROWS = 2
@@ -23,6 +25,7 @@ STATE_TARGETS = {
     "dropped": {"width": 108, "height": 70, "baseline": 118},
     "recover": {"width": 102, "height": 84, "baseline": 116},
 }
+DIRECTIONS = ("e", "ne", "n", "nw", "w", "sw", "s", "se")
 
 
 def remove_green_key(image: Image.Image) -> Image.Image:
@@ -115,6 +118,34 @@ def normalize_for_state(frame: Image.Image, state_name: str, dx: int = 0, dy: in
     return place_subject(subject, dx, dy, target["baseline"])
 
 
+def mirror_frame(frame: Image.Image) -> Image.Image:
+    return frame.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+
+
+def offset_frame(frame: Image.Image, dx: int = 0, dy: int = 0) -> Image.Image:
+    bbox = subject_bbox(frame)
+    if not bbox:
+        return frame.copy()
+    subject = frame.crop(bbox)
+    return place_subject(subject, dx, dy, bbox[3] + dy)
+
+
+def direction_frame(frame: Image.Image, direction: str) -> Image.Image:
+    next_frame = mirror_frame(frame) if "w" in direction else frame.copy()
+    offsets = {
+        "e": (1, 0),
+        "ne": (1, -2),
+        "n": (0, -3),
+        "nw": (-1, -2),
+        "w": (-1, 0),
+        "sw": (-1, 2),
+        "s": (0, 3),
+        "se": (1, 2),
+    }
+    dx, dy = offsets[direction]
+    return offset_frame(next_frame, dx, dy)
+
+
 def pingpong(values):
     return values + values[-2:0:-1]
 
@@ -162,6 +193,41 @@ def make_frames(base):
     return frames
 
 
+def save_sheet(name: str, frames: list[Image.Image]) -> dict:
+    sheet = Image.new("RGBA", (FRAME_SIZE * len(frames), FRAME_SIZE), (0, 0, 0, 0))
+    for index, frame in enumerate(frames):
+        sheet.alpha_composite(frame, (index * FRAME_SIZE, 0))
+    out = ACTION_DIR / f"{name}.png"
+    sheet.save(out)
+    return {"file": f"assets/actions/{name}.png", "frames": len(frames)}
+
+
+def save_action_sheets(frames: list[Image.Image]):
+    ACTION_DIR.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "frameSize": FRAME_SIZE,
+        "clips": {
+            "idle": {**save_sheet("idle", frames[0:32]), "fps": 8, "loop": True},
+            "grabbed-neck": {**save_sheet("grabbed-neck", frames[92:108]), "fps": 10, "loop": True},
+            "dropped": {**save_sheet("dropped", frames[108:120]), "fps": 12, "loop": False},
+            "recover": {**save_sheet("recover", frames[120:128]), "fps": 7, "loop": True},
+        },
+    }
+
+    directional_ranges = {
+        "curious": (32, 48, 9, True),
+        "walk": (48, 68, 10, True),
+        "play": (68, 92, 12, True),
+    }
+    for action, (start, end, fps, loop) in directional_ranges.items():
+        for direction in DIRECTIONS:
+            directed = [direction_frame(frame, direction) for frame in frames[start:end]]
+            key = f"{action}-{direction}"
+            manifest["clips"][key] = {**save_sheet(key, directed), "fps": fps, "loop": loop}
+
+    (ACTION_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+
 def main():
     ASSET_DIR.mkdir(parents=True, exist_ok=True)
     source = Image.open(SOURCE).convert("RGB")
@@ -204,6 +270,7 @@ def main():
         frame.save(ASSET_DIR / f"lulu-frame-{index + 1:03d}.png")
 
     sheet.save(ASSET_DIR / "lulu-sprite-128.png")
+    save_action_sheets(frames)
     print(f"wrote {len(frames)} frames to {ASSET_DIR / 'lulu-sprite-128.png'}")
 
 

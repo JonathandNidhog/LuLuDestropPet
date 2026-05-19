@@ -12,8 +12,7 @@ const NEAR_RADIUS = 165;
 const PLAY_RADIUS = 112;
 const APPROACH_RADIUS = 380;
 const LEAVE_CURSOR_GAP = 34;
-const TRANSITION_MS = 140;
-const FACING_DEAD_ZONE = 36;
+const TRANSITION_MS = 120;
 const STATE_MIN_MS = {
   idle: 500,
   curious: 360,
@@ -24,20 +23,35 @@ const STATE_MIN_MS = {
   recover: 620
 };
 
-const animations = {
-  idle: { start: 0, count: 32, fps: 8, loop: true },
-  curious: { start: 32, count: 16, fps: 9, loop: true },
-  walk: { start: 48, count: 20, fps: 10, loop: true },
-  play: { start: 68, count: 24, fps: 12, loop: true },
-  grabbed: { start: 92, count: 16, fps: 10, loop: true },
-  dropped: { start: 108, count: 12, fps: 12, loop: false },
-  recover: { start: 120, count: 8, fps: 7, loop: true }
+const directions = ['e', 'ne', 'n', 'nw', 'w', 'sw', 's', 'se'];
+const clips = {
+  idle: { file: './assets/actions/idle.png', frames: 32, fps: 8, loop: true },
+  grabbed: { file: './assets/actions/grabbed-neck.png', frames: 16, fps: 10, loop: true },
+  dropped: { file: './assets/actions/dropped.png', frames: 12, fps: 12, loop: false },
+  recover: { file: './assets/actions/recover.png', frames: 8, fps: 7, loop: true }
 };
 
-const sprite = new Image();
-sprite.src = './assets/lulu-sprite-128.png';
+for (const action of ['curious', 'walk', 'play']) {
+  for (const direction of directions) {
+    const frames = action === 'play' ? 24 : action === 'walk' ? 20 : 16;
+    const fps = action === 'play' ? 12 : action === 'walk' ? 10 : 9;
+    clips[`${action}-${direction}`] = {
+      file: `./assets/actions/${action}-${direction}.png`,
+      frames,
+      fps,
+      loop: true
+    };
+  }
+}
+
+const images = {};
+for (const [key, clip] of Object.entries(clips)) {
+  images[key] = new Image();
+  images[key].src = clip.file;
+}
 
 let state = 'idle';
+let direction = 'e';
 let grabbed = false;
 let lastCursor = { x: 210, y: 210, t: performance.now() };
 let cursorSpeed = 0;
@@ -45,7 +59,6 @@ let playSince = 0;
 let animationStart = performance.now();
 let stateChangedAt = performance.now();
 let dropTimer = 0;
-let facing = 1;
 let transition = null;
 let stateLockedUntil = 0;
 
@@ -53,21 +66,41 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function clipKey(action = state, dir = direction) {
+  if (action === 'curious' || action === 'walk' || action === 'play') {
+    return `${action}-${dir}`;
+  }
+  return action;
+}
+
 function setState(next) {
-  if (state === next) return;
   const now = performance.now();
+  if (state === next) return;
   const minTime = STATE_MIN_MS[state] ?? 0;
   if (now < stateLockedUntil || (now - stateChangedAt < minTime && next !== 'grabbed' && next !== 'dropped')) {
     return;
   }
   transition = {
-    fromFrame: currentFrame(now),
-    fromFacing: facing,
+    key: clipKey(),
+    frame: currentFrame(now),
     startedAt: now
   };
   state = next;
   animationStart = now;
   stateChangedAt = now;
+}
+
+function setDirection(next) {
+  if (direction === next || grabbed || state === 'dropped') return;
+  if ((state === 'curious' || state === 'walk' || state === 'play') && next !== direction) {
+    transition = {
+      key: clipKey(),
+      frame: currentFrame(performance.now()),
+      startedAt: performance.now()
+    };
+    animationStart = performance.now();
+  }
+  direction = next;
 }
 
 function toLogicalPoint(point) {
@@ -77,6 +110,15 @@ function toLogicalPoint(point) {
     x: point.x / width * BASE_SIZE,
     y: point.y / height * BASE_SIZE
   };
+}
+
+function directionFromPoint(point) {
+  const dx = point.x - CENTER.x;
+  const dy = point.y - CENTER.y;
+  if (Math.hypot(dx, dy) < 24) return direction;
+  const angle = Math.atan2(-dy, dx);
+  const octant = Math.round(angle / (Math.PI / 4));
+  return directions[(octant + 8) % 8];
 }
 
 function distanceToCat(point) {
@@ -106,7 +148,7 @@ function updatePlayState(point) {
 
   const now = performance.now();
   const d = distanceToCat(point);
-  updateFacing(point);
+  setDirection(directionFromPoint(point));
 
   if (d < PLAY_RADIUS && cursorSpeed < 900) {
     if (!playSince) playSince = now;
@@ -126,29 +168,21 @@ function updatePlayState(point) {
   }
 }
 
-function updateFacing(point) {
-  const dx = point.x - CENTER.x;
-  if (Math.abs(dx) < FACING_DEAD_ZONE || state === 'grabbed' || state === 'dropped') return;
-  facing = dx >= 0 ? 1 : -1;
-}
-
-function currentFrame(time) {
-  const animation = animations[state] || animations.idle;
+function currentFrame(time, key = clipKey()) {
+  const clip = clips[key] || clips.idle;
   const elapsed = Math.max(0, time - animationStart);
-  const raw = Math.floor(elapsed / (1000 / animation.fps));
-  const local = animation.loop ? raw % animation.count : Math.min(raw, animation.count - 1);
-  return animation.start + local;
+  const raw = Math.floor(elapsed / (1000 / clip.fps));
+  return clip.loop ? raw % clip.frames : Math.min(raw, clip.frames - 1);
 }
 
-function drawFrame(frame, alpha, drawFacing) {
+function drawClipFrame(key, frame, alpha) {
+  const image = images[key];
+  if (!image || !image.complete || image.naturalWidth <= 0) return;
+
   ctx.save();
   ctx.globalAlpha = alpha;
-  if (drawFacing < 0) {
-    ctx.translate(FRAME_SIZE, 0);
-    ctx.scale(-1, 1);
-  }
   ctx.drawImage(
-    sprite,
+    image,
     frame * FRAME_SIZE,
     0,
     FRAME_SIZE,
@@ -164,16 +198,15 @@ function drawFrame(frame, alpha, drawFacing) {
 function draw(time) {
   ctx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
 
-  if (sprite.complete && sprite.naturalWidth > 0) {
-    const frame = currentFrame(time);
-    if (transition) {
-      const progress = clamp((time - transition.startedAt) / TRANSITION_MS, 0, 1);
-      drawFrame(transition.fromFrame, 1 - progress, transition.fromFacing);
-      drawFrame(frame, progress, facing);
-      if (progress >= 1) transition = null;
-    } else {
-      drawFrame(frame, 1, facing);
-    }
+  const key = clipKey();
+  const frame = currentFrame(time, key);
+  if (transition) {
+    const progress = clamp((time - transition.startedAt) / TRANSITION_MS, 0, 1);
+    drawClipFrame(transition.key, transition.frame, 1 - progress);
+    drawClipFrame(key, frame, progress);
+    if (progress >= 1) transition = null;
+  } else {
+    drawClipFrame(key, frame, 1);
   }
 
   requestAnimationFrame(draw);
