@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lulu Desktop Pet</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="stage" aria-label="Lulu desktop pet">
+      <section id="lulu" class="pet idle" aria-hidden="true">
+        <canvas id="sprite" width="128" height="128"></canvas>
+        <button class="grab-zone ear-left" data-zone="ear" aria-label="drag left ear"></button>
+        <button class="grab-zone ear-right" data-zone="ear" aria-label="drag right ear"></button>
+        <button class="grab-zone neck" data-zone="neck" aria-label="drag neck"></button>
+      </section>
+    </main>
+    <script src="./renderer.js"></script>
+  </body>
+</html>
