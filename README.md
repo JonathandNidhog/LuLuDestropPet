@@ -9,7 +9,7 @@ Cream cameo Maine Coon boy Lulu as a desktop pet. This version uses a generated 
 - Drop: Lulu lands with a soft squash animation.
 - No text bubbles by default.
 - Tray size menu: Small / Medium / Large.
-- 56 sprite frames are loaded from `src/assets/lulu-sprite-56.png`.
+- 128 sprite frames are loaded from `src/assets/lulu-sprite-128.png`.
 
 ## Run
 
@@ -47,14 +47,14 @@ git push
 
 ## Sprite Assets
 
-The current version uses a 56-frame sprite sheet generated from a richer 8x8 Lulu pixel-art action sheet. The second source row is skipped because it contains head-only closeups that do not work for a desktop pet body animation.
+The current version uses a 128-frame sprite sheet generated from the approved 8-pose Lulu pixel-art concept. Idle is intentionally restricted to the lying/blinking pose so Lulu does not spin in place.
 
-- `idle`: 8 frames
-- `curious`: 8 frames
-- `play`: 8 frames
-- `walk`: 8 frames
-- `grabbed`: 8 frames
-- `dropped`: 8 frames
+- `idle`: 32 frames
+- `curious`: 16 frames
+- `walk`: 20 frames
+- `play`: 24 frames
+- `grabbed`: 16 frames
+- `dropped`: 12 frames
 - `recover`: 8 frames
 
 Regenerate the sprite assets with:

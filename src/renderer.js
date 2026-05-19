@@ -14,17 +14,17 @@ const APPROACH_RADIUS = 380;
 const LEAVE_CURSOR_GAP = 34;
 
 const animations = {
-  idle: { start: 0, count: 8, fps: 7, loop: true },
-  curious: { start: 8, count: 8, fps: 9, loop: true },
-  play: { start: 16, count: 8, fps: 12, loop: true },
-  walk: { start: 24, count: 8, fps: 10, loop: true },
-  grabbed: { start: 32, count: 8, fps: 10, loop: true },
-  dropped: { start: 40, count: 8, fps: 12, loop: false },
-  recover: { start: 48, count: 8, fps: 7, loop: true }
+  idle: { start: 0, count: 32, fps: 8, loop: true },
+  curious: { start: 32, count: 16, fps: 9, loop: true },
+  walk: { start: 48, count: 20, fps: 10, loop: true },
+  play: { start: 68, count: 24, fps: 12, loop: true },
+  grabbed: { start: 92, count: 16, fps: 10, loop: true },
+  dropped: { start: 108, count: 12, fps: 12, loop: false },
+  recover: { start: 120, count: 8, fps: 7, loop: true }
 };
 
 const sprite = new Image();
-sprite.src = './assets/lulu-sprite-56.png';
+sprite.src = './assets/lulu-sprite-128.png';
 
 let state = 'idle';
 let grabbed = false;
@@ -142,7 +142,7 @@ window.luluPet.onDropped(() => {
   grabbed = false;
   setState('dropped');
   clearTimeout(dropTimer);
-  dropTimer = setTimeout(() => setState('recover'), 460);
+  dropTimer = setTimeout(() => setState('recover'), 900);
 });
 
 for (const hotspot of hotspots) {
