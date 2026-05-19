@@ -47,13 +47,14 @@ git push
 
 ## Sprite Assets
 
-The current version uses a 56-frame sprite sheet generated from the approved Lulu pixel-art concept:
+The current version uses a 56-frame sprite sheet generated from a richer 8x8 Lulu pixel-art action sheet. The second source row is skipped because it contains head-only closeups that do not work for a desktop pet body animation.
 
-- `idle`: 12 frames
+- `idle`: 8 frames
 - `curious`: 8 frames
-- `play`: 12 frames
-- `grabbed`: 10 frames
-- `dropped`: 6 frames
+- `play`: 8 frames
+- `walk`: 8 frames
+- `grabbed`: 8 frames
+- `dropped`: 8 frames
 - `recover`: 8 frames
 
 Regenerate the sprite assets with:

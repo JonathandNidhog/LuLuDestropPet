@@ -6,6 +6,8 @@ let tray;
 let dragging = false;
 let clickThrough = false;
 let currentSize = 'medium';
+let lastScreenCursor = null;
+let lastCursorTime = Date.now();
 
 const PET_SIZES = {
   small: 240,
@@ -104,12 +106,37 @@ function createTray() {
   ]));
 }
 
+function easeWindowTowardCursor(cursor, bounds, cursorSpeed) {
+  if (dragging || clickThrough || !win || win.isDestroyed() || !win.isVisible()) return;
+
+  const centerX = bounds.x + bounds.width * 0.5;
+  const centerY = bounds.y + bounds.height * 0.5;
+  const dx = cursor.x - centerX;
+  const dy = cursor.y - centerY;
+  const distance = Math.hypot(dx, dy);
+
+  if (distance > 520 || distance < bounds.width * 0.36 || cursorSpeed > 1800) return;
+
+  const side = dx < 0 ? 1 : -1;
+  const targetX = cursor.x + side * bounds.width * 0.24 - bounds.width * 0.5;
+  const targetY = cursor.y + bounds.height * 0.08 - bounds.height * 0.5;
+  const nextX = bounds.x + (targetX - bounds.x) * 0.045;
+  const nextY = bounds.y + (targetY - bounds.y) * 0.045;
+
+  win.setPosition(Math.round(nextX), Math.round(nextY), false);
+}
+
 function startCursorLoop() {
   setInterval(() => {
     if (!win || win.isDestroyed()) return;
 
     const cursor = screen.getCursorScreenPoint();
-    const bounds = win.getBounds();
+    let bounds = win.getBounds();
+    const now = Date.now();
+    const elapsed = Math.max(16, now - lastCursorTime);
+    const cursorSpeed = lastScreenCursor
+      ? Math.hypot(cursor.x - lastScreenCursor.x, cursor.y - lastScreenCursor.y) / elapsed * 1000
+      : 0;
 
     if (dragging) {
       win.setPosition(
@@ -117,6 +144,9 @@ function startCursorLoop() {
         Math.round(cursor.y - dragAnchor.y),
         false
       );
+    } else {
+      easeWindowTowardCursor(cursor, bounds, cursorSpeed);
+      bounds = win.getBounds();
     }
 
     win.webContents.send('cursor:update', {
@@ -129,6 +159,9 @@ function startCursorLoop() {
       },
       dragging
     });
+
+    lastScreenCursor = cursor;
+    lastCursorTime = now;
   }, 33);
 }
 

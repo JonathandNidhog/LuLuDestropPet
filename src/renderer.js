@@ -10,15 +10,17 @@ const BASE_SIZE = 420;
 const CENTER = { x: 210, y: 205 };
 const NEAR_RADIUS = 165;
 const PLAY_RADIUS = 112;
+const APPROACH_RADIUS = 380;
 const LEAVE_CURSOR_GAP = 34;
 
 const animations = {
-  idle: { start: 0, count: 12, fps: 8, loop: true },
-  curious: { start: 12, count: 8, fps: 10, loop: true },
-  play: { start: 20, count: 12, fps: 14, loop: true },
-  grabbed: { start: 32, count: 10, fps: 12, loop: true },
-  dropped: { start: 42, count: 6, fps: 14, loop: false },
-  recover: { start: 48, count: 8, fps: 8, loop: true }
+  idle: { start: 0, count: 8, fps: 7, loop: true },
+  curious: { start: 8, count: 8, fps: 9, loop: true },
+  play: { start: 16, count: 8, fps: 12, loop: true },
+  walk: { start: 24, count: 8, fps: 10, loop: true },
+  grabbed: { start: 32, count: 8, fps: 10, loop: true },
+  dropped: { start: 40, count: 8, fps: 12, loop: false },
+  recover: { start: 48, count: 8, fps: 7, loop: true }
 };
 
 const sprite = new Image();
@@ -88,7 +90,13 @@ function updatePlayState(point) {
 
   playSince = 0;
   pet.style.transform = '';
-  setState(d < NEAR_RADIUS && cursorSpeed < 1300 ? 'curious' : 'idle');
+  if (d < NEAR_RADIUS && cursorSpeed < 1300) {
+    setState('curious');
+  } else if (d < APPROACH_RADIUS && cursorSpeed < 1300) {
+    setState('walk');
+  } else {
+    setState('idle');
+  }
 }
 
 function currentFrame(time) {
@@ -143,7 +151,11 @@ for (const hotspot of hotspots) {
     grabbed = true;
     setState('grabbed');
     hotspot.setPointerCapture(event.pointerId);
-    window.luluPet.startDrag({ x: event.clientX, y: event.clientY });
+    const zone = hotspot.dataset.zone;
+    const anchor = zone === 'neck'
+      ? { x: window.innerWidth * 0.5, y: window.innerHeight * 0.34 }
+      : { x: event.clientX, y: event.clientY };
+    window.luluPet.startDrag(anchor);
   });
 
   hotspot.addEventListener('pointerup', () => {
