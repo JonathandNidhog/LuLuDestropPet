@@ -19,7 +19,6 @@ const CENTER = { x: 210, y: 205 };
 const NEAR_RADIUS = 165;
 const PLAY_RADIUS = 112;
 const LEAVE_CURSOR_GAP = 34;
-const SCALE = 3;
 const BASE_SIZE = 420;
 
 const colors = {
@@ -263,8 +262,6 @@ function drawPixelLulu(time) {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.save();
-  ctx.scale(SCALE, SCALE);
-  ctx.translate(0, 0);
 
   px(29, 105, 73, 8, colors.shadow);
   drawTail(frame, mode);
