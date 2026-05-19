@@ -1,6 +1,7 @@
 from pathlib import Path
 import math
 import json
+import hashlib
 
 from PIL import Image
 
@@ -151,17 +152,35 @@ def pingpong(values):
 
 
 def make_frames(base):
-    idle_open, _idle_blink, crouch, stretch, reach, grabbed, flat, loaf = base
+    idle_open, idle_blink, crouch, stretch, reach, grabbed, flat, loaf = base
     frames = []
 
-    # 0-31 idle: use the same source pose every frame to prevent visual scale flicker.
-    for i in range(32):
-        frames.append(normalize_for_state(idle_open, "idle"))
+    # 0-15 idle: small real motion only. No duplicated filler frames.
+    idle_pattern = [
+        (idle_open, 0, 0),
+        (idle_open, 0, -1),
+        (idle_open, 1, -1),
+        (idle_open, 1, 0),
+        (idle_blink, 0, 0),
+        (idle_blink, 0, 1),
+        (idle_open, -1, 0),
+        (idle_open, -1, -1),
+        (idle_open, 0, -1),
+        (idle_open, 1, -1),
+        (idle_open, 1, 0),
+        (idle_open, 0, 1),
+        (idle_open, -1, 1),
+        (idle_open, -1, 0),
+        (idle_open, 0, 0),
+        (idle_open, 0, -1),
+    ]
+    for pose, dx, dy in idle_pattern:
+        frames.append(normalize_for_state(pose, "idle", dx=dx, dy=dy))
 
     # 32-47 curious: crouch/look-near, gentle forward interest.
     for i in range(16):
-        dx = round(math.sin(i / 16 * math.tau) * 1)
-        dy = -1 if 4 <= i <= 10 else 0
+        dx = round(math.sin(i / 16 * math.tau) * 3)
+        dy = round(math.cos(i / 16 * math.tau) * 2)
         frames.append(normalize_for_state(crouch, "curious", dx=dx, dy=dy))
 
     # 48-67 approach: actual walking/creeping pose sequence, not idle.
@@ -173,12 +192,12 @@ def make_frames(base):
     # 68-91 play: reach and paw tap loop.
     for i in range(24):
         pose = reach if i % 6 < 3 else stretch
-        tap = -3 if i % 6 in (1, 2) else 0
-        frames.append(normalize_for_state(pose, "play", dx=round(math.sin(i / 24 * math.tau) * 2), dy=tap))
+        tap = -5 if i % 6 in (1, 2) else 1 if i % 6 == 4 else 0
+        frames.append(normalize_for_state(pose, "play", dx=round(math.sin(i / 24 * math.tau) * 4), dy=tap))
 
     # 92-107 grabbed: held by back of neck, subtle body sway only.
     for i in range(16):
-        frames.append(normalize_for_state(grabbed, "grabbed", dx=round(math.sin(i / 16 * math.tau) * 2), dy=round(math.cos(i / 16 * math.tau) * 1)))
+        frames.append(normalize_for_state(grabbed, "grabbed", dx=round(math.sin(i / 16 * math.tau) * 4), dy=round(math.cos(i / 16 * math.tau) * 2)))
 
     # 108-119 dropped: soft landing using flat/squash.
     for i in range(12):
@@ -189,7 +208,7 @@ def make_frames(base):
         pose = loaf if i < 5 else idle_open
         frames.append(normalize_for_state(pose, "recover", dy=round(math.sin(i / 8 * math.tau) * 1)))
 
-    assert len(frames) == 128
+    assert len(frames) == 112
     return frames
 
 
@@ -202,27 +221,61 @@ def save_sheet(name: str, frames: list[Image.Image]) -> dict:
     return {"file": f"assets/actions/{name}.png", "frames": len(frames)}
 
 
+def frame_hash(frame: Image.Image) -> str:
+    return hashlib.sha256(frame.tobytes()).hexdigest()
+
+
+def assert_no_consecutive_duplicates(name: str, frames: list[Image.Image]):
+    for index in range(1, len(frames)):
+        if frame_hash(frames[index - 1]) == frame_hash(frames[index]):
+            raise ValueError(f"{name} has duplicate consecutive frames at {index - 1} and {index}")
+
+
+def remove_consecutive_duplicates(frames: list[Image.Image]) -> list[Image.Image]:
+    unique = []
+    last = None
+    for frame in frames:
+        digest = frame_hash(frame)
+        if digest != last:
+            unique.append(frame)
+            last = digest
+    return unique
+
+
 def save_action_sheets(frames: list[Image.Image]):
     ACTION_DIR.mkdir(parents=True, exist_ok=True)
+    idle_frames = remove_consecutive_duplicates(frames[0:16])
+    grabbed_frames = remove_consecutive_duplicates(frames[76:92])
+    dropped_frames = remove_consecutive_duplicates(frames[92:104])
+    recover_frames = remove_consecutive_duplicates(frames[104:112])
+    for key, segment in {
+        "idle": idle_frames,
+        "grabbed-neck": grabbed_frames,
+        "dropped": dropped_frames,
+        "recover": recover_frames,
+    }.items():
+        assert_no_consecutive_duplicates(key, segment)
+
     manifest = {
         "frameSize": FRAME_SIZE,
         "clips": {
-            "idle": {**save_sheet("idle", frames[0:32]), "fps": 8, "loop": True},
-            "grabbed-neck": {**save_sheet("grabbed-neck", frames[92:108]), "fps": 10, "loop": True},
-            "dropped": {**save_sheet("dropped", frames[108:120]), "fps": 12, "loop": False},
-            "recover": {**save_sheet("recover", frames[120:128]), "fps": 7, "loop": True},
+            "idle": {**save_sheet("idle", idle_frames), "fps": 8, "loop": True},
+            "grabbed-neck": {**save_sheet("grabbed-neck", grabbed_frames), "fps": 10, "loop": True},
+            "dropped": {**save_sheet("dropped", dropped_frames), "fps": 12, "loop": False},
+            "recover": {**save_sheet("recover", recover_frames), "fps": 7, "loop": True},
         },
     }
 
     directional_ranges = {
-        "curious": (32, 48, 9, True),
-        "walk": (48, 68, 10, True),
-        "play": (68, 92, 12, True),
+        "curious": (16, 32, 9, True),
+        "walk": (32, 52, 10, True),
+        "play": (52, 76, 12, True),
     }
     for action, (start, end, fps, loop) in directional_ranges.items():
         for direction in DIRECTIONS:
-            directed = [direction_frame(frame, direction) for frame in frames[start:end]]
+            directed = remove_consecutive_duplicates([direction_frame(frame, direction) for frame in frames[start:end]])
             key = f"{action}-{direction}"
+            assert_no_consecutive_duplicates(key, directed)
             manifest["clips"][key] = {**save_sheet(key, directed), "fps": fps, "loop": loop}
 
     (ACTION_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -269,9 +322,9 @@ def main():
         sheet.alpha_composite(frame, (index * FRAME_SIZE, 0))
         frame.save(ASSET_DIR / f"lulu-frame-{index + 1:03d}.png")
 
-    sheet.save(ASSET_DIR / "lulu-sprite-128.png")
+    sheet.save(ASSET_DIR / "lulu-sprite-112.png")
     save_action_sheets(frames)
-    print(f"wrote {len(frames)} frames to {ASSET_DIR / 'lulu-sprite-128.png'}")
+    print(f"wrote {len(frames)} frames to {ASSET_DIR / 'lulu-sprite-112.png'}")
 
 
 if __name__ == "__main__":

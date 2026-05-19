@@ -3,7 +3,7 @@
   "clips": {
     "idle": {
       "file": "assets/actions/idle.png",
-      "frames": 32,
+      "frames": 16,
       "fps": 8,
       "loop": true
     },
@@ -15,61 +15,61 @@
     },
     "dropped": {
       "file": "assets/actions/dropped.png",
-      "frames": 12,
+      "frames": 6,
       "fps": 12,
       "loop": false
     },
     "recover": {
       "file": "assets/actions/recover.png",
-      "frames": 8,
+      "frames": 4,
       "fps": 7,
       "loop": true
     },
     "curious-e": {
       "file": "assets/actions/curious-e.png",
-      "frames": 16,
+      "frames": 9,
       "fps": 9,
       "loop": true
     },
     "curious-ne": {
       "file": "assets/actions/curious-ne.png",
-      "frames": 16,
+      "frames": 9,
       "fps": 9,
       "loop": true
     },
     "curious-n": {
       "file": "assets/actions/curious-n.png",
-      "frames": 16,
+      "frames": 9,
       "fps": 9,
       "loop": true
     },
     "curious-nw": {
       "file": "assets/actions/curious-nw.png",
-      "frames": 16,
+      "frames": 9,
       "fps": 9,
       "loop": true
     },
     "curious-w": {
       "file": "assets/actions/curious-w.png",
-      "frames": 16,
+      "frames": 9,
       "fps": 9,
       "loop": true
     },
     "curious-sw": {
       "file": "assets/actions/curious-sw.png",
-      "frames": 16,
+      "frames": 9,
       "fps": 9,
       "loop": true
     },
     "curious-s": {
       "file": "assets/actions/curious-s.png",
-      "frames": 16,
+      "frames": 9,
       "fps": 9,
       "loop": true
     },
     "curious-se": {
       "file": "assets/actions/curious-se.png",
-      "frames": 16,
+      "frames": 9,
       "fps": 9,
       "loop": true
     },
@@ -123,49 +123,49 @@
     },
     "play-e": {
       "file": "assets/actions/play-e.png",
-      "frames": 24,
+      "frames": 20,
       "fps": 12,
       "loop": true
     },
     "play-ne": {
       "file": "assets/actions/play-ne.png",
-      "frames": 24,
+      "frames": 20,
       "fps": 12,
       "loop": true
     },
     "play-n": {
       "file": "assets/actions/play-n.png",
-      "frames": 24,
+      "frames": 20,
       "fps": 12,
       "loop": true
     },
     "play-nw": {
       "file": "assets/actions/play-nw.png",
-      "frames": 24,
+      "frames": 20,
       "fps": 12,
       "loop": true
     },
     "play-w": {
       "file": "assets/actions/play-w.png",
-      "frames": 24,
+      "frames": 20,
       "fps": 12,
       "loop": true
     },
     "play-sw": {
       "file": "assets/actions/play-sw.png",
-      "frames": 24,
+      "frames": 20,
       "fps": 12,
       "loop": true
     },
     "play-s": {
       "file": "assets/actions/play-s.png",
-      "frames": 24,
+      "frames": 20,
       "fps": 12,
       "loop": true
     },
     "play-se": {
       "file": "assets/actions/play-se.png",
-      "frames": 24,
+      "frames": 20,
       "fps": 12,
       "loop": true
     }

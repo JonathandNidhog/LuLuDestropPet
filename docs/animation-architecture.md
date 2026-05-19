@@ -155,6 +155,8 @@ Required first-pass actions:
 
 - No frame contains neighboring sprite fragments.
 - Within each animation clip, visible bbox height and foot baseline stay stable.
+- No animation clip may contain consecutive duplicate frames; generation fails if duplicates are detected.
+- Do not pad animation length by copying a frame. If an action has only 6 meaningful frames, the manifest must say 6 frames.
 - Mouse interaction chooses correct direction among eight directions.
 - Tail moves independently and never stretches away from body.
 - Idle does not spin, scale, or visibly flicker.

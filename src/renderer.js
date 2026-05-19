@@ -24,31 +24,8 @@ const STATE_MIN_MS = {
 };
 
 const directions = ['e', 'ne', 'n', 'nw', 'w', 'sw', 's', 'se'];
-const clips = {
-  idle: { file: './assets/actions/idle.png', frames: 32, fps: 8, loop: true },
-  grabbed: { file: './assets/actions/grabbed-neck.png', frames: 16, fps: 10, loop: true },
-  dropped: { file: './assets/actions/dropped.png', frames: 12, fps: 12, loop: false },
-  recover: { file: './assets/actions/recover.png', frames: 8, fps: 7, loop: true }
-};
-
-for (const action of ['curious', 'walk', 'play']) {
-  for (const direction of directions) {
-    const frames = action === 'play' ? 24 : action === 'walk' ? 20 : 16;
-    const fps = action === 'play' ? 12 : action === 'walk' ? 10 : 9;
-    clips[`${action}-${direction}`] = {
-      file: `./assets/actions/${action}-${direction}.png`,
-      frames,
-      fps,
-      loop: true
-    };
-  }
-}
-
+let clips = {};
 const images = {};
-for (const [key, clip] of Object.entries(clips)) {
-  images[key] = new Image();
-  images[key].src = clip.file;
-}
 
 let state = 'idle';
 let direction = 'e';
@@ -61,6 +38,7 @@ let stateChangedAt = performance.now();
 let dropTimer = 0;
 let transition = null;
 let stateLockedUntil = 0;
+let ready = false;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -70,7 +48,20 @@ function clipKey(action = state, dir = direction) {
   if (action === 'curious' || action === 'walk' || action === 'play') {
     return `${action}-${dir}`;
   }
+  if (action === 'grabbed') return 'grabbed-neck';
   return action;
+}
+
+async function loadClips() {
+  const response = await fetch('./assets/actions/manifest.json');
+  const manifest = await response.json();
+  clips = manifest.clips;
+
+  for (const [key, clip] of Object.entries(clips)) {
+    images[key] = new Image();
+    images[key].src = `./${clip.file}`;
+  }
+  ready = true;
 }
 
 function setState(next) {
@@ -170,6 +161,7 @@ function updatePlayState(point) {
 
 function currentFrame(time, key = clipKey()) {
   const clip = clips[key] || clips.idle;
+  if (!clip) return 0;
   const elapsed = Math.max(0, time - animationStart);
   const raw = Math.floor(elapsed / (1000 / clip.fps));
   return clip.loop ? raw % clip.frames : Math.min(raw, clip.frames - 1);
@@ -198,15 +190,17 @@ function drawClipFrame(key, frame, alpha) {
 function draw(time) {
   ctx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
 
-  const key = clipKey();
-  const frame = currentFrame(time, key);
-  if (transition) {
-    const progress = clamp((time - transition.startedAt) / TRANSITION_MS, 0, 1);
-    drawClipFrame(transition.key, transition.frame, 1 - progress);
-    drawClipFrame(key, frame, progress);
-    if (progress >= 1) transition = null;
-  } else {
-    drawClipFrame(key, frame, 1);
+  if (ready) {
+    const key = clipKey();
+    const frame = currentFrame(time, key);
+    if (transition) {
+      const progress = clamp((time - transition.startedAt) / TRANSITION_MS, 0, 1);
+      drawClipFrame(transition.key, transition.frame, 1 - progress);
+      drawClipFrame(key, frame, progress);
+      if (progress >= 1) transition = null;
+    } else {
+      drawClipFrame(key, frame, 1);
+    }
   }
 
   requestAnimationFrame(draw);
@@ -263,4 +257,5 @@ window.addEventListener('pointerup', () => {
   if (grabbed) window.luluPet.endDrag();
 });
 
+loadClips();
 requestAnimationFrame(draw);
