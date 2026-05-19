@@ -57,6 +57,13 @@ The current version uses a 128-frame sprite sheet generated from the approved 8-
 - `dropped`: 12 frames
 - `recover`: 8 frames
 
+Renderer behavior:
+
+- Lulu flips horizontally based on the mouse direction.
+- State changes crossfade briefly to reduce hard cuts.
+- States have minimum dwell times so idle, walk, and play do not flicker rapidly.
+- Generated frames keep a fixed scale; dropped frames no longer squash-scale the cat.
+
 Regenerate the sprite assets with:
 
 ```powershell

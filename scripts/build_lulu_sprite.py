@@ -1,7 +1,7 @@
 from pathlib import Path
 import math
 
-from PIL import Image, ImageEnhance
+from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,25 +91,13 @@ def place_subject(subject: Image.Image, x_bias: int = 0, y_bias: int = 0) -> Ima
     return frame
 
 
-def transform_frame(frame: Image.Image, dx: int = 0, dy: int = 0, scale_x: float = 1, scale_y: float = 1) -> Image.Image:
+def transform_frame(frame: Image.Image, dx: int = 0, dy: int = 0) -> Image.Image:
     bbox = subject_bbox(frame)
     if not bbox:
         return frame.copy()
 
     subject = frame.crop(bbox)
-    subject = subject.resize(
-        (max(1, round(subject.width * scale_x)), max(1, round(subject.height * scale_y))),
-        Image.Resampling.NEAREST,
-    )
     return place_subject(subject, dx, dy)
-
-
-def tint_frame(frame: Image.Image, factor: float) -> Image.Image:
-    rgb = Image.new("RGBA", frame.size, (0, 0, 0, 0))
-    visible = frame.convert("RGBA")
-    enhanced = ImageEnhance.Brightness(visible).enhance(factor)
-    rgb.alpha_composite(enhanced)
-    return rgb
 
 
 def pingpong(values):
@@ -150,8 +138,7 @@ def make_frames(base):
 
     # 108-119 dropped: soft landing using flat/squash.
     for i in range(12):
-        squash = 1 + (0.04 if 2 <= i <= 5 else 0)
-        frames.append(transform_frame(flat, dy=3 - min(i, 5), scale_x=squash, scale_y=1 / squash))
+        frames.append(transform_frame(flat, dy=3 - min(i, 5)))
 
     # 120-127 recover: loaf settles back into idle.
     for i in range(8):

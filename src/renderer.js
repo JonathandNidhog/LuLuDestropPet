@@ -12,6 +12,17 @@ const NEAR_RADIUS = 165;
 const PLAY_RADIUS = 112;
 const APPROACH_RADIUS = 380;
 const LEAVE_CURSOR_GAP = 34;
+const TRANSITION_MS = 140;
+const FACING_DEAD_ZONE = 36;
+const STATE_MIN_MS = {
+  idle: 500,
+  curious: 360,
+  walk: 520,
+  play: 760,
+  grabbed: 0,
+  dropped: 0,
+  recover: 620
+};
 
 const animations = {
   idle: { start: 0, count: 32, fps: 8, loop: true },
@@ -32,7 +43,11 @@ let lastCursor = { x: 210, y: 210, t: performance.now() };
 let cursorSpeed = 0;
 let playSince = 0;
 let animationStart = performance.now();
+let stateChangedAt = performance.now();
 let dropTimer = 0;
+let facing = 1;
+let transition = null;
+let stateLockedUntil = 0;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -40,8 +55,19 @@ function clamp(value, min, max) {
 
 function setState(next) {
   if (state === next) return;
+  const now = performance.now();
+  const minTime = STATE_MIN_MS[state] ?? 0;
+  if (now < stateLockedUntil || (now - stateChangedAt < minTime && next !== 'grabbed' && next !== 'dropped')) {
+    return;
+  }
+  transition = {
+    fromFrame: currentFrame(now),
+    fromFacing: facing,
+    startedAt: now
+  };
   state = next;
-  animationStart = performance.now();
+  animationStart = now;
+  stateChangedAt = now;
 }
 
 function toLogicalPoint(point) {
@@ -80,6 +106,7 @@ function updatePlayState(point) {
 
   const now = performance.now();
   const d = distanceToCat(point);
+  updateFacing(point);
 
   if (d < PLAY_RADIUS && cursorSpeed < 900) {
     if (!playSince) playSince = now;
@@ -99,6 +126,12 @@ function updatePlayState(point) {
   }
 }
 
+function updateFacing(point) {
+  const dx = point.x - CENTER.x;
+  if (Math.abs(dx) < FACING_DEAD_ZONE || state === 'grabbed' || state === 'dropped') return;
+  facing = dx >= 0 ? 1 : -1;
+}
+
 function currentFrame(time) {
   const animation = animations[state] || animations.idle;
   const elapsed = Math.max(0, time - animationStart);
@@ -107,22 +140,40 @@ function currentFrame(time) {
   return animation.start + local;
 }
 
+function drawFrame(frame, alpha, drawFacing) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if (drawFacing < 0) {
+    ctx.translate(FRAME_SIZE, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(
+    sprite,
+    frame * FRAME_SIZE,
+    0,
+    FRAME_SIZE,
+    FRAME_SIZE,
+    0,
+    0,
+    FRAME_SIZE,
+    FRAME_SIZE
+  );
+  ctx.restore();
+}
+
 function draw(time) {
   ctx.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
 
   if (sprite.complete && sprite.naturalWidth > 0) {
     const frame = currentFrame(time);
-    ctx.drawImage(
-      sprite,
-      frame * FRAME_SIZE,
-      0,
-      FRAME_SIZE,
-      FRAME_SIZE,
-      0,
-      0,
-      FRAME_SIZE,
-      FRAME_SIZE
-    );
+    if (transition) {
+      const progress = clamp((time - transition.startedAt) / TRANSITION_MS, 0, 1);
+      drawFrame(transition.fromFrame, 1 - progress, transition.fromFacing);
+      drawFrame(frame, progress, facing);
+      if (progress >= 1) transition = null;
+    } else {
+      drawFrame(frame, 1, facing);
+    }
   }
 
   requestAnimationFrame(draw);
@@ -141,8 +192,12 @@ window.luluPet.onCursorUpdate((payload) => {
 window.luluPet.onDropped(() => {
   grabbed = false;
   setState('dropped');
+  stateLockedUntil = performance.now() + 900;
   clearTimeout(dropTimer);
-  dropTimer = setTimeout(() => setState('recover'), 900);
+  dropTimer = setTimeout(() => {
+    stateLockedUntil = 0;
+    setState('recover');
+  }, 900);
 });
 
 for (const hotspot of hotspots) {
